@@ -16,6 +16,7 @@
 | POST | `/api/timer/reset` | タイマーのリセット |
 | GET | `/api/stats/today` | 本日の統計取得 |
 | GET | `/api/stats/week` | 直近7日間の統計取得 |
+| GET | `/api/stats/month` | 直近30日間の統計取得 |
 | GET | `/api/stats/date/<date_str>` | 指定日の統計取得 |
 | GET | `/api/config` | 現在の設定取得 |
 | POST | `/api/config` | 設定の更新 |
@@ -169,7 +170,7 @@
 
 ### GET /api/stats/today
 
-本日の集中統計を取得します。
+本日の集中統計を取得します。ゲーミフィケーション情報（XP・レベル・連続記録・バッジ）も含みます。
 
 **レスポンス:**
 
@@ -182,7 +183,14 @@
   "total_minutes": 75,
   "total_hours": 1,
   "remaining_minutes": 15,
-  "formatted_time": "1時間15分"
+  "formatted_time": "1時間15分",
+  "xp": 300,
+  "level": 1,
+  "streak_days": 2,
+  "badges": [
+    { "id": "streak_3", "title": "3日連続", "description": "3日連続で1回以上ポモドーロを完了", "achieved": false },
+    { "id": "weekly_10", "title": "今週10回完了", "description": "1週間で10回以上ポモドーロを完了", "achieved": false }
+  ]
 }
 ```
 
@@ -194,6 +202,10 @@
 | `total_hours` | integer | 集中時間合計（時間単位の整数部） |
 | `remaining_minutes` | integer | 時間を超えた余り分数 |
 | `formatted_time` | string | 表示用文字列（例: `"1時間15分"` / `"45分"`） |
+| `xp` | integer | 累計XP（1セッション = 100XP） |
+| `level` | integer | 現在のレベル（500XP ごとに1レベル上昇、最小値1） |
+| `streak_days` | integer | 連続記録日数（本日含む） |
+| `badges` | array | バッジ一覧（`id`、`title`、`description`、`achieved` を含むオブジェクト配列） |
 
 ---
 
@@ -214,6 +226,12 @@
   },
   "total_sessions": 5,
   "total_focus_time": 7500,
+  "average_focus_time": 1500.0,
+  "completion_rate": 8.93,
+  "chart_data": [
+    { "date": "2025-04-11", "sessions": 0, "total_focus_time": 0 },
+    "..."
+  ],
   "formatted_time": "2時間5分"
 }
 ```
@@ -223,7 +241,20 @@
 | `daily` | object | 日付 (`YYYY-MM-DD`) をキーとした各日の統計 |
 | `total_sessions` | integer | 7日間の合計セッション数 |
 | `total_focus_time` | integer | 7日間の合計集中時間（秒） |
+| `average_focus_time` | number | セッション1回あたりの平均集中時間（秒） |
+| `completion_rate` | number | 完了率（%）。目安は1日8セッション × 7日 = 56セッションが100% |
+| `chart_data` | array | 古い順の日別統計配列（`date`、`sessions`、`total_focus_time` を含む） |
 | `formatted_time` | string | 表示用文字列 |
+
+---
+
+### GET /api/stats/month
+
+直近30日間（本日を含む）の統計を取得します。レスポンス形式は `/api/stats/week` と同じです（`daily` キーは30日分）。
+
+**レスポンス:**
+
+- **200 OK** — `/api/stats/week` と同じフォーマット（集計対象が30日間）
 
 ---
 
@@ -267,7 +298,9 @@
   "work_duration": 1500,
   "break_duration": 300,
   "long_break_duration": 900,
-  "sessions_until_long_break": 4
+  "sessions_until_long_break": 4,
+  "work_duration_options": [900, 1500, 2100, 2700],
+  "break_duration_options": [300, 600, 900]
 }
 ```
 
@@ -277,6 +310,8 @@
 | `break_duration` | integer | 300 | 通常休憩時間（秒） |
 | `long_break_duration` | integer | 900 | 長休憩時間（秒） |
 | `sessions_until_long_break` | integer | 4 | 長休憩までのセッション数 |
+| `work_duration_options` | array | [900,1500,2100,2700] | 選択可能な作業時間の候補（秒） |
+| `break_duration_options` | array | [300,600,900] | 選択可能な休憩時間の候補（秒） |
 
 ---
 
@@ -297,12 +332,12 @@
 
 **バリデーション範囲:**
 
-| フィールド | 最小値 | 最大値 |
-|-----------|--------|--------|
-| `work_duration` | 60 | 3600 |
-| `break_duration` | 60 | 1800 |
-| `long_break_duration` | 300 | 3600 |
-| `sessions_until_long_break` | 1 | 10 |
+| フィールド | バリデーション | 説明 |
+|-----------|--------------|------|
+| `work_duration` | `{900, 1500, 2100, 2700}` のいずれか | 候補値以外は無視 |
+| `break_duration` | `{300, 600, 900}` のいずれか | 候補値以外は無視 |
+| `long_break_duration` | 300 以上 3600 以下 | 範囲外は無視 |
+| `sessions_until_long_break` | 1 以上 10 以下 | 範囲外は無視 |
 
 **レスポンス:**
 
