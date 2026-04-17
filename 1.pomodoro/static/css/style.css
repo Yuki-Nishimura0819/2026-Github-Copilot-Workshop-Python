@@ -130,7 +130,7 @@ h1 {
   border-radius: 50%;
   padding: 20px;
   background: conic-gradient(var(--ring-color) calc(var(--progress) * 1%), var(--ring-bg) 0%);
-  transition: background 900ms linear;
+  transition: background 1000ms linear;
 }
 
 .ring-inner {
