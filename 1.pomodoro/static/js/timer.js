@@ -184,6 +184,7 @@ function renderBadges(badges) {
     const chip = document.createElement("span");
     chip.className = `badge-chip${badge.achieved ? " achieved" : ""}`;
     chip.textContent = badge.achieved ? `🏅 ${badge.title}` : `🔒 ${badge.title}`;
+    chip.setAttribute("aria-label", `${badge.title} - ${badge.achieved ? "達成済み" : "未達成"}`);
     badgeList.appendChild(chip);
   }
 }
@@ -197,8 +198,19 @@ function renderPeriodSummary(target, periodStats) {
 function renderMiniChart(target, chartData, limit = 7) {
   target.innerHTML = "";
   const recentData = chartData.slice(-limit);
-  const maxSessions = Math.max(1, ...recentData.map((item) => item.sessions || 0));
   target.style.gridTemplateColumns = `repeat(${Math.max(recentData.length, 1)}, 1fr)`;
+
+  if (recentData.length === 0) {
+    const placeholder = document.createElement("div");
+    placeholder.className = "bar";
+    placeholder.style.height = "4%";
+    placeholder.style.opacity = "0.2";
+    placeholder.title = "データなし";
+    target.appendChild(placeholder);
+    return;
+  }
+
+  const maxSessions = Math.max(1, ...recentData.map((item) => item.sessions || 0));
 
   for (const item of recentData) {
     const bar = document.createElement("div");

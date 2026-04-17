@@ -16,14 +16,27 @@ class StatsService:
 
     def __init__(self, repository: Repository):
         self.repository = repository
+        self._gamification_cache = {
+            "date": None,
+            "total_sessions": 0,
+            "streak_days": 0,
+        }
 
     def get_today_stats(self) -> dict:
         """Get today's statistics with proper formatting."""
         today = datetime.now().strftime("%Y-%m-%d")
         stats = self._load_stats(today)
         formatted = self._format_stats(stats)
-        total_sessions = self._get_total_sessions(days=365)
-        streak_days = self._calculate_streak()
+
+        if self._gamification_cache["date"] != today:
+            self._gamification_cache = {
+                "date": today,
+                "total_sessions": self._get_total_sessions(days=365),
+                "streak_days": self._calculate_streak(),
+            }
+
+        total_sessions = self._gamification_cache["total_sessions"]
+        streak_days = self._gamification_cache["streak_days"]
         week_stats = self.get_week_stats()
 
         formatted.update({
@@ -105,7 +118,7 @@ class StatsService:
             total_sessions += stats["sessions"]
             total_focus_time += stats["total_focus_time"]
 
-        average_focus_time = total_focus_time // total_sessions if total_sessions > 0 else 0
+        average_focus_time_per_session = total_focus_time / total_sessions if total_sessions > 0 else 0
         completion_rate = min(
             100.0,
             (total_sessions / (7 * EXPECTED_SESSIONS_PER_DAY)) * 100,
@@ -115,7 +128,7 @@ class StatsService:
             "daily": week_data,
             "total_sessions": total_sessions,
             "total_focus_time": total_focus_time,
-            "average_focus_time": average_focus_time,
+            "average_focus_time": round(average_focus_time_per_session, 2),
             "completion_rate": round(completion_rate, 2),
             "chart_data": list(reversed(chart_data)),
             "formatted_time": self.format_focus_time(total_focus_time),
@@ -143,7 +156,7 @@ class StatsService:
             total_sessions += stats["sessions"]
             total_focus_time += stats["total_focus_time"]
 
-        average_focus_time = total_focus_time // total_sessions if total_sessions > 0 else 0
+        average_focus_time_per_session = total_focus_time / total_sessions if total_sessions > 0 else 0
         completion_rate = min(
             100.0,
             (total_sessions / (days * EXPECTED_SESSIONS_PER_DAY)) * 100,
@@ -153,7 +166,7 @@ class StatsService:
             "daily": period_data,
             "total_sessions": total_sessions,
             "total_focus_time": total_focus_time,
-            "average_focus_time": average_focus_time,
+            "average_focus_time": round(average_focus_time_per_session, 2),
             "completion_rate": round(completion_rate, 2),
             "chart_data": list(reversed(chart_data)),
             "formatted_time": self.format_focus_time(total_focus_time),
