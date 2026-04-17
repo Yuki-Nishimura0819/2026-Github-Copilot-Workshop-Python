@@ -3,7 +3,12 @@ const state = {
   remaining: 0,
   workDuration: 1500,
   breakDuration: 300,
+  longBreakDuration: 900,
+  sessionsUntilLongBreak: 4,
   timerId: null,
+  statsRefreshId: null,
+  soundEnabled: localStorage.getItem("soundEnabled") !== "false",
+  darkMode: localStorage.getItem("darkMode") === "true",
 };
 
 const statusText = document.getElementById("statusText");
@@ -95,17 +100,77 @@ async function api(path, options = {}) {
   return data;
 }
 
+// Phase 6: Sound notification
+function playNotificationSound(type = "complete") {
+  if (!state.soundEnabled) {
+    return;
+  }
+  try {
+    // Use Web Audio API to generate simple beep tone
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+
+    if (type === "complete") {
+      oscillator.frequency.value = 800;
+      gainNode.gain.setValueAtTime(0.3, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.5);
+    } else if (type === "break") {
+      oscillator.frequency.value = 600;
+      gainNode.gain.setValueAtTime(0.2, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.3);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.3);
+    }
+  } catch (e) {
+    console.log("Sound notification not available:", e);
+  }
+}
+
+// Phase 6: Dark mode toggle
+function toggleDarkMode() {
+  state.darkMode = !state.darkMode;
+  localStorage.setItem("darkMode", state.darkMode.toString());
+  document.documentElement.setAttribute("data-theme", state.darkMode ? "dark" : "light");
+}
+
+// Initialize dark mode on load
+function initDarkMode() {
+  document.documentElement.setAttribute("data-theme", state.darkMode ? "dark" : "light");
+}
+
 async function refreshStats() {
   try {
     const stats = await api("/api/stats/today");
     const sessions = Number(stats.sessions || 0);
-    const totalFocusTime = Number(stats.total_focus_time || 0);
-    const mins = Math.floor(totalFocusTime / 60);
+    const formatTime = stats.formatted_time || `${Math.floor((stats.total_focus_time || 0) / 60)}分`;
 
     sessionsValue.textContent = String(sessions);
-    focusMinutesValue.textContent = `${mins}分`;
+    focusMinutesValue.textContent = formatTime;
   } catch (error) {
     setError(error.message);
+  }
+}
+
+async function startStatsRefresh() {
+  if (state.statsRefreshId) {
+    return;
+  }
+  // Refresh stats every 5 seconds
+  state.statsRefreshId = window.setInterval(async () => {
+    await refreshStats();
+  }, 5000);
+}
+
+function stopStatsRefresh() {
+  if (state.statsRefreshId) {
+    window.clearInterval(state.statsRefreshId);
+    state.statsRefreshId = null;
   }
 }
 
@@ -116,6 +181,18 @@ async function refreshState() {
     setError("");
   } catch (error) {
     setError(error.message);
+  }
+}
+
+async function loadConfig() {
+  try {
+    const config = await api("/api/config");
+    state.workDuration = config.work_duration || 1500;
+    state.breakDuration = config.break_duration || 300;
+    state.longBreakDuration = config.long_break_duration || 900;
+    state.sessionsUntilLongBreak = config.sessions_until_long_break || 4;
+  } catch (error) {
+    console.warn("Failed to load config:", error);
   }
 }
 
@@ -131,22 +208,28 @@ function startLoop() {
     return;
   }
 
+  startStatsRefresh();
+
   state.timerId = window.setInterval(async () => {
     try {
       const data = await api("/api/timer/tick", { method: "POST" });
       applyApiState(data);
 
       if (data.remaining === 0) {
+        playNotificationSound("complete");
         if (data.state === "working") {
           const breakState = await api("/api/timer/start-break", { method: "POST" });
           applyApiState(breakState);
+          playNotificationSound("break");
           await refreshStats();
         } else {
           stopLoop();
+          stopStatsRefresh();
         }
       }
     } catch (error) {
       stopLoop();
+      stopStatsRefresh();
       setError(error.message);
     }
   }, 1000);
@@ -168,6 +251,7 @@ async function resetTimer() {
   try {
     const data = await api("/api/timer/reset", { method: "POST" });
     stopLoop();
+    stopStatsRefresh();
     state.workDuration = Math.max(data.remaining || state.workDuration, 1);
     applyApiState(data);
     await refreshStats();
@@ -186,6 +270,8 @@ resetButton.addEventListener("click", () => {
 });
 
 async function init() {
+  initDarkMode();
+  await loadConfig();
   await refreshState();
   if (state.mode === "working" || state.mode === "break") {
     startLoop();

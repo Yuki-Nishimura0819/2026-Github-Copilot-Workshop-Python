@@ -28,9 +28,24 @@ class TimerService:
         if not self.state_machine.start_break():
             return {"error": "無効な状態遷移"}
 
-        self.timer = Timer(self.config.BREAK_DURATION)
+        # Determine break duration (long break if threshold reached)
+        break_duration = self._get_break_duration()
+        self.timer = Timer(break_duration)
         self.timer.start()
         return self.get_current_state()
+
+    def _get_break_duration(self) -> int:
+        """Determine whether to use standard or long break."""
+        sessions_until_long = self.config.SESSIONS_UNTIL_LONG_BREAK
+        # Long break when completed_sessions is a multiple of sessions_until_long
+        # (but not when completed_sessions = 0)
+        if (
+            sessions_until_long > 0
+            and self.state_machine.completed_sessions > 0
+            and self.state_machine.completed_sessions % sessions_until_long == 0
+        ):
+            return self.config.LONG_BREAK_DURATION
+        return self.config.BREAK_DURATION
 
     def tick(self) -> dict:
         if self.timer.status != "working":

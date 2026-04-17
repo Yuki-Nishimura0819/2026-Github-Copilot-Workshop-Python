@@ -6,6 +6,8 @@ class Config:
 
     WORK_DURATION = int(os.getenv("WORK_DURATION", "1500"))
     BREAK_DURATION = int(os.getenv("BREAK_DURATION", "300"))
+    LONG_BREAK_DURATION = int(os.getenv("LONG_BREAK_DURATION", "900"))
+    SESSIONS_UNTIL_LONG_BREAK = int(os.getenv("SESSIONS_UNTIL_LONG_BREAK", "4"))
     REPOSITORY_TYPE = os.getenv("REPOSITORY_TYPE", "file")
     DEBUG = False
     TESTING = False
@@ -25,6 +27,8 @@ class TestConfig(Config):
     REPOSITORY_TYPE = "memory"
     WORK_DURATION = 10
     BREAK_DURATION = 5
+    LONG_BREAK_DURATION = 15
+    SESSIONS_UNTIL_LONG_BREAK = 2
 
 
 class ProductionConfig(Config):

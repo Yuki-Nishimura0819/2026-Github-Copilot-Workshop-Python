@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 from config import DevelopmentConfig
 from models.repository import FileRepository, InMemoryRepository
@@ -55,11 +55,54 @@ def create_app(config_object=None):
     def get_today_stats():
         return jsonify(stats_service.get_today_stats())
 
+    @app.get("/api/stats/week")
+    def get_week_stats():
+        return jsonify(stats_service.get_week_stats())
+
+    @app.get("/api/stats/date/<date_str>")
+    def get_stats_by_date(date_str):
+        stats = stats_service.get_stats_by_date(date_str)
+        status_code = 400 if "error" in stats else 200
+        return jsonify(stats), status_code
+
+    # Configuration API (Phase 6)
+    @app.get("/api/config")
+    def get_config():
+        return jsonify({
+            "work_duration": app.config.get("WORK_DURATION", 1500),
+            "break_duration": app.config.get("BREAK_DURATION", 300),
+            "long_break_duration": app.config.get("LONG_BREAK_DURATION", 900),
+            "sessions_until_long_break": app.config.get("SESSIONS_UNTIL_LONG_BREAK", 4),
+        })
+
+    @app.post("/api/config")
+    def update_config():
+        data = request.get_json() or {}
+        # Validate and update configuration
+        if "work_duration" in data:
+            val = int(data.get("work_duration", 0))
+            if 60 <= val <= 3600:
+                app.config["WORK_DURATION"] = val
+                timer_service.config.WORK_DURATION = val
+        if "break_duration" in data:
+            val = int(data.get("break_duration", 0))
+            if 60 <= val <= 1800:
+                app.config["BREAK_DURATION"] = val
+                timer_service.config.BREAK_DURATION = val
+        if "long_break_duration" in data:
+            val = int(data.get("long_break_duration", 0))
+            if 300 <= val <= 3600:
+                app.config["LONG_BREAK_DURATION"] = val
+        if "sessions_until_long_break" in data:
+            val = int(data.get("sessions_until_long_break", 0))
+            if 1 <= val <= 10:
+                app.config["SESSIONS_UNTIL_LONG_BREAK"] = val
+
+        return jsonify({"status": "updated"}), 200
+
     return app
 
 
-app = create_app()
-
-
 if __name__ == "__main__":
+    app = create_app()
     app.run(debug=app.config.get("DEBUG", False))
