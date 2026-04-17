@@ -4,6 +4,12 @@ from datetime import datetime, timedelta
 
 from models.repository import Repository
 
+XP_PER_SESSION = 100
+XP_PER_LEVEL = 500
+WEEKLY_BADGE_TARGET = 10
+STREAK_BADGE_TARGET = 3
+EXPECTED_SESSIONS_PER_DAY = 8
+
 
 class StatsService:
     """Provides statistics retrieval and formatting helpers."""
@@ -15,7 +21,18 @@ class StatsService:
         """Get today's statistics with proper formatting."""
         today = datetime.now().strftime("%Y-%m-%d")
         stats = self._load_stats(today)
-        return self._format_stats(stats)
+        formatted = self._format_stats(stats)
+        total_sessions = self._get_total_sessions(days=365)
+        streak_days = self._calculate_streak()
+        week_stats = self.get_week_stats()
+
+        formatted.update({
+            "xp": total_sessions * XP_PER_SESSION,
+            "level": (total_sessions * XP_PER_SESSION) // XP_PER_LEVEL + 1,
+            "streak_days": streak_days,
+            "badges": self._calculate_badges(streak_days, week_stats["total_sessions"]),
+        })
+        return formatted
 
     def _load_stats(self, date_str: str) -> dict:
         """Load raw statistics for the given date."""
@@ -72,6 +89,7 @@ class StatsService:
     def get_week_stats(self) -> dict:
         """Get statistics for the past 7 days."""
         week_data = {}
+        chart_data = []
         total_sessions = 0
         total_focus_time = 0
 
@@ -79,12 +97,97 @@ class StatsService:
             date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
             stats = self._load_stats(date)
             week_data[date] = stats
+            chart_data.append({
+                "date": date,
+                "sessions": stats["sessions"],
+                "total_focus_time": stats["total_focus_time"],
+            })
             total_sessions += stats["sessions"]
             total_focus_time += stats["total_focus_time"]
+
+        average_focus_time = total_focus_time // total_sessions if total_sessions > 0 else 0
+        completion_rate = min(
+            100.0,
+            (total_sessions / (7 * EXPECTED_SESSIONS_PER_DAY)) * 100,
+        )
 
         return {
             "daily": week_data,
             "total_sessions": total_sessions,
             "total_focus_time": total_focus_time,
+            "average_focus_time": average_focus_time,
+            "completion_rate": round(completion_rate, 2),
+            "chart_data": list(reversed(chart_data)),
             "formatted_time": self.format_focus_time(total_focus_time),
         }
+
+    def get_month_stats(self) -> dict:
+        """Get statistics for the past 30 days."""
+        return self._get_period_stats(30)
+
+    def _get_period_stats(self, days: int) -> dict:
+        period_data = {}
+        chart_data = []
+        total_sessions = 0
+        total_focus_time = 0
+
+        for i in range(days):
+            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            stats = self._load_stats(date)
+            period_data[date] = stats
+            chart_data.append({
+                "date": date,
+                "sessions": stats["sessions"],
+                "total_focus_time": stats["total_focus_time"],
+            })
+            total_sessions += stats["sessions"]
+            total_focus_time += stats["total_focus_time"]
+
+        average_focus_time = total_focus_time // total_sessions if total_sessions > 0 else 0
+        completion_rate = min(
+            100.0,
+            (total_sessions / (days * EXPECTED_SESSIONS_PER_DAY)) * 100,
+        )
+
+        return {
+            "daily": period_data,
+            "total_sessions": total_sessions,
+            "total_focus_time": total_focus_time,
+            "average_focus_time": average_focus_time,
+            "completion_rate": round(completion_rate, 2),
+            "chart_data": list(reversed(chart_data)),
+            "formatted_time": self.format_focus_time(total_focus_time),
+        }
+
+    def _calculate_streak(self) -> int:
+        streak = 0
+        for i in range(365):
+            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            if self._load_stats(date)["sessions"] > 0:
+                streak += 1
+            else:
+                break
+        return streak
+
+    def _get_total_sessions(self, days: int) -> int:
+        total_sessions = 0
+        for i in range(days):
+            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            total_sessions += self._load_stats(date)["sessions"]
+        return total_sessions
+
+    def _calculate_badges(self, streak_days: int, weekly_sessions: int) -> list[dict]:
+        return [
+            {
+                "id": "streak_3",
+                "title": "3日連続",
+                "description": "3日連続で1回以上ポモドーロを完了",
+                "achieved": streak_days >= STREAK_BADGE_TARGET,
+            },
+            {
+                "id": "weekly_10",
+                "title": "今週10回完了",
+                "description": "1週間で10回以上ポモドーロを完了",
+                "achieved": weekly_sessions >= WEEKLY_BADGE_TARGET,
+            },
+        ]

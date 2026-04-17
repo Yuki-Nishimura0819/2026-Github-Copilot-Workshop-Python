@@ -15,6 +15,14 @@ const statusText = document.getElementById("statusText");
 const timeDisplay = document.getElementById("timeDisplay");
 const sessionsValue = document.getElementById("sessionsValue");
 const focusMinutesValue = document.getElementById("focusMinutesValue");
+const levelValue = document.getElementById("levelValue");
+const streakValue = document.getElementById("streakValue");
+const xpValue = document.getElementById("xpValue");
+const badgeList = document.getElementById("badgeList");
+const weekSummary = document.getElementById("weekSummary");
+const monthSummary = document.getElementById("monthSummary");
+const weekChart = document.getElementById("weekChart");
+const monthChart = document.getElementById("monthChart");
 const ringWrap = document.getElementById("ringWrap");
 const errorMessage = document.getElementById("errorMessage");
 const startButton = document.getElementById("startButton");
@@ -146,14 +154,60 @@ function initDarkMode() {
 
 async function refreshStats() {
   try {
-    const stats = await api("/api/stats/today");
-    const sessions = Number(stats.sessions || 0);
-    const formatTime = stats.formatted_time || `${Math.floor((stats.total_focus_time || 0) / 60)}分`;
+    const [todayStats, weekStats, monthStats] = await Promise.all([
+      api("/api/stats/today"),
+      api("/api/stats/week"),
+      api("/api/stats/month"),
+    ]);
+    const sessions = Number(todayStats.sessions || 0);
+    const formatTime = todayStats.formatted_time || `${Math.floor((todayStats.total_focus_time || 0) / 60)}分`;
 
     sessionsValue.textContent = String(sessions);
     focusMinutesValue.textContent = formatTime;
+    levelValue.textContent = `Lv.${todayStats.level || 1}`;
+    streakValue.textContent = `${todayStats.streak_days || 0}日`;
+    xpValue.textContent = `${todayStats.xp || 0} XP`;
+
+    renderBadges(todayStats.badges || []);
+    renderPeriodSummary(weekSummary, weekStats);
+    renderPeriodSummary(monthSummary, monthStats);
+    renderMiniChart(weekChart, weekStats.chart_data || [], 7);
+    renderMiniChart(monthChart, monthStats.chart_data || [], 10);
   } catch (error) {
     setError(error.message);
+  }
+}
+
+function renderBadges(badges) {
+  badgeList.innerHTML = "";
+  for (const badge of badges) {
+    const chip = document.createElement("span");
+    chip.className = `badge-chip${badge.achieved ? " achieved" : ""}`;
+    chip.textContent = badge.achieved ? `🏅 ${badge.title}` : `🔒 ${badge.title}`;
+    badgeList.appendChild(chip);
+  }
+}
+
+function renderPeriodSummary(target, periodStats) {
+  const completionRate = Number(periodStats.completion_rate || 0).toFixed(1);
+  const averageFocusMinutes = Math.floor((periodStats.average_focus_time || 0) / 60);
+  target.textContent = `完了率: ${completionRate}% / 平均集中: ${averageFocusMinutes}分`;
+}
+
+function renderMiniChart(target, chartData, limit = 7) {
+  target.innerHTML = "";
+  const recentData = chartData.slice(-limit);
+  const maxSessions = Math.max(1, ...recentData.map((item) => item.sessions || 0));
+  target.style.gridTemplateColumns = `repeat(${Math.max(recentData.length, 1)}, 1fr)`;
+
+  for (const item of recentData) {
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    const sessions = item.sessions || 0;
+    const height = Math.max(4, Math.round((sessions / maxSessions) * 100));
+    bar.style.height = `${height}%`;
+    bar.title = `${item.date}: ${sessions}回`;
+    target.appendChild(bar);
   }
 }
 
