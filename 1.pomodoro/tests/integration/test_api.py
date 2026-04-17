@@ -76,12 +76,14 @@ def test_config_get_endpoint(client):
     assert "break_duration" in payload
     assert "long_break_duration" in payload
     assert "sessions_until_long_break" in payload
+    assert payload["work_duration_options"] == [900, 1500, 2100, 2700]
+    assert payload["break_duration_options"] == [300, 600, 900]
 
 
 def test_config_update_endpoint(client):
     """Test updating configuration."""
     new_config = {
-        "work_duration": 1200,
+        "work_duration": 2100,
         "break_duration": 600,
         "long_break_duration": 1200,
         "sessions_until_long_break": 3,
@@ -96,30 +98,26 @@ def test_config_update_endpoint(client):
     # Verify new config is returned
     verify = client.get("/api/config")
     verify_payload = verify.get_json()
-    assert verify_payload["work_duration"] == 1200
+    assert verify_payload["work_duration"] == 2100
     assert verify_payload["break_duration"] == 600
 
 
 def test_config_validation_boundaries(client):
-    """Test that config validation enforces boundaries."""
-    # Get initial config  
+    """Test that config validation enforces allowed options."""
     initial = client.get("/api/config")
     initial_work_duration = initial.get_json()["work_duration"]
-    
-    # Try to set invalid value (too low)
+
+    # 1200 is within 60-3600 but not an allowed preset value.
     invalid_config = {
-        "work_duration": 10,  # Too low, should be rejected
+        "work_duration": 1200,
     }
-    
+
     response = client.post("/api/config", json=invalid_config)
-    
-    # Verify response is 200 (endpoint doesn't error, just ignores)
+
     assert response.status_code == 200
-    
-    # Verify value wasn't changed (should remain the same)
+
     verify = client.get("/api/config")
     payload = verify.get_json()
-    # Value should not have changed to the invalid value
     assert payload["work_duration"] == initial_work_duration
 
 
