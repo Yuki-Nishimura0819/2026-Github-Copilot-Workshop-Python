@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pomodoro Timer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="bg-shape shape-a" aria-hidden="true"></div>
+  <div class="bg-shape shape-b" aria-hidden="true"></div>
+
+  <main class="app-shell">
+    <header class="app-header">
+      <p class="eyebrow">FOCUS CYCLE</p>
+      <h1>ポモドーロタイマー</h1>
+      <p id="statusText" class="status-text">待機中</p>
+    </header>
+
+    <section class="timer-panel" aria-label="タイマー">
+      <div class="ring-wrap" id="ringWrap" data-progress="0">
+        <div class="ring-inner">
+          <p class="time-label">残り時間</p>
+          <p id="timeDisplay" class="time-value">25:00</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="startButton" class="btn btn-primary" type="button">開始</button>
+        <button id="resetButton" class="btn btn-ghost" type="button">リセット</button>
+      </div>
+    </section>
+
+    <section class="stats-panel" aria-label="今日の進捗">
+      <h2>今日の進捗</h2>
+      <div class="stats-grid">
+        <article class="stat-card">
+          <p class="stat-label">完了セッション</p>
+          <p id="sessionsValue" class="stat-value">0</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">集中時間</p>
+          <p id="focusMinutesValue" class="stat-value">0分</p>
+        </article>
+      </div>
+    </section>
+
+    <p id="errorMessage" class="error-message" role="alert" aria-live="polite"></p>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/timer.js') }}"></script>
+</body>
+</html>
