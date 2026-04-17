@@ -12,13 +12,14 @@
 <body>
   <div class="bg-shape shape-a" aria-hidden="true"></div>
   <div class="bg-shape shape-b" aria-hidden="true"></div>
+  <div id="focusEffect" class="focus-effect" aria-hidden="true"></div>
 
   <main class="app-shell">
     <header class="app-header">
       <div class="header-top">
         <p class="eyebrow">FOCUS CYCLE</p>
         <div class="header-controls">
-          <button id="darkModeBtn" class="btn-icon" title="ダークモード切り替え" aria-label="ダークモード切り替え">
+          <button id="darkModeBtn" class="btn-icon" title="テーマ切り替え" aria-label="テーマ切り替え">
             <span id="themeIcon">🌙</span>
           </button>
           <button id="settingsBtn" class="btn-icon" title="設定を開く" aria-label="設定を開く">⚙️</button>
@@ -53,6 +54,30 @@
           <p class="stat-label">集中時間</p>
           <p id="focusMinutesValue" class="stat-value">0分</p>
         </article>
+        <article class="stat-card">
+          <p class="stat-label">現在レベル</p>
+          <p id="levelValue" class="stat-value">Lv.1</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">連続日数（ストリーク）</p>
+          <p id="streakValue" class="stat-value">0日</p>
+        </article>
+      </div>
+      <div class="gamification-panel">
+        <p class="xp-text">経験値: <strong id="xpValue">0 XP</strong></p>
+        <div class="badge-list" id="badgeList" aria-label="達成バッジ"></div>
+      </div>
+      <div class="period-stats-grid">
+        <article class="period-card">
+          <h3>週間統計</h3>
+          <p id="weekSummary" class="period-summary">完了率: 0%</p>
+          <div id="weekChart" class="mini-chart" aria-label="週間グラフ"></div>
+        </article>
+        <article class="period-card">
+          <h3>月間統計</h3>
+          <p id="monthSummary" class="period-summary">完了率: 0%</p>
+          <div id="monthChart" class="mini-chart" aria-label="月間グラフ"></div>
+        </article>
       </div>
     </section>
 
@@ -70,12 +95,21 @@
         <fieldset class="settings-group">
           <legend>タイマー設定</legend>
           <div class="setting-item">
-            <label for="workDurationInput">作業時間（秒）</label>
-            <input type="number" id="workDurationInput" min="60" max="3600" value="1500">
+            <label for="workDurationInput">作業時間</label>
+            <select id="workDurationInput">
+              <option value="900">15分</option>
+              <option value="1500" selected>25分</option>
+              <option value="2100">35分</option>
+              <option value="2700">45分</option>
+            </select>
           </div>
           <div class="setting-item">
-            <label for="breakDurationInput">休憩時間（秒）</label>
-            <input type="number" id="breakDurationInput" min="60" max="1800" value="300">
+            <label for="breakDurationInput">休憩時間</label>
+            <select id="breakDurationInput">
+              <option value="300" selected>5分</option>
+              <option value="600">10分</option>
+              <option value="900">15分</option>
+            </select>
           </div>
           <div class="setting-item">
             <label for="longBreakDurationInput">長休憩時間（秒）</label>
@@ -89,9 +123,25 @@
 
         <fieldset class="settings-group">
           <legend>通知・アクセシビリティ</legend>
+          <div class="setting-item">
+            <label for="themeSelect">テーマ</label>
+            <select id="themeSelect">
+              <option value="light" selected>ライト</option>
+              <option value="dark">ダーク</option>
+              <option value="focus">フォーカス（ミニマル）</option>
+            </select>
+          </div>
           <div class="setting-item checkbox">
-            <input type="checkbox" id="soundEnabledCheckbox" checked>
-            <label for="soundEnabledCheckbox">音声通知を有効にする</label>
+            <input type="checkbox" id="startSoundCheckbox" checked>
+            <label for="startSoundCheckbox">開始音</label>
+          </div>
+          <div class="setting-item checkbox">
+            <input type="checkbox" id="endSoundCheckbox" checked>
+            <label for="endSoundCheckbox">終了音</label>
+          </div>
+          <div class="setting-item checkbox">
+            <input type="checkbox" id="tickSoundCheckbox">
+            <label for="tickSoundCheckbox">tick音</label>
           </div>
         </fieldset>
       </div>
@@ -103,6 +153,5 @@
   </div>
 
   <script src="{{ url_for('static', filename='js/timer.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 </body>
 </html>

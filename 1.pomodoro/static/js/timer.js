@@ -7,18 +7,46 @@ const state = {
   sessionsUntilLongBreak: 4,
   timerId: null,
   statsRefreshId: null,
-  soundEnabled: localStorage.getItem("soundEnabled") !== "false",
-  darkMode: localStorage.getItem("darkMode") === "true",
+  soundSettings: {
+    start: localStorage.getItem("soundStartEnabled") !== "false",
+    end: localStorage.getItem("soundEndEnabled") !== "false",
+    tick: localStorage.getItem("soundTickEnabled") === "true",
+  },
+  theme: localStorage.getItem("theme") || "light",
+  uiVariant: "enhanced",
 };
 
 const statusText = document.getElementById("statusText");
 const timeDisplay = document.getElementById("timeDisplay");
 const sessionsValue = document.getElementById("sessionsValue");
 const focusMinutesValue = document.getElementById("focusMinutesValue");
+const levelValue = document.getElementById("levelValue");
+const streakValue = document.getElementById("streakValue");
+const xpValue = document.getElementById("xpValue");
+const badgeList = document.getElementById("badgeList");
+const weekSummary = document.getElementById("weekSummary");
+const monthSummary = document.getElementById("monthSummary");
+const weekChart = document.getElementById("weekChart");
+const monthChart = document.getElementById("monthChart");
 const ringWrap = document.getElementById("ringWrap");
 const errorMessage = document.getElementById("errorMessage");
 const startButton = document.getElementById("startButton");
 const resetButton = document.getElementById("resetButton");
+const darkModeBtn = document.getElementById("darkModeBtn");
+const themeIcon = document.getElementById("themeIcon");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsModal = document.getElementById("settingsModal");
+const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+const cancelSettingsBtn = document.getElementById("cancelSettingsBtn");
+const applySettingsBtn = document.getElementById("applySettingsBtn");
+const workDurationInput = document.getElementById("workDurationInput");
+const breakDurationInput = document.getElementById("breakDurationInput");
+const longBreakDurationInput = document.getElementById("longBreakDurationInput");
+const sessionsUntilLongBreakInput = document.getElementById("sessionsUntilLongBreakInput");
+const themeSelect = document.getElementById("themeSelect");
+const startSoundCheckbox = document.getElementById("startSoundCheckbox");
+const endSoundCheckbox = document.getElementById("endSoundCheckbox");
+const tickSoundCheckbox = document.getElementById("tickSoundCheckbox");
 
 function formatTime(seconds) {
   const mins = Math.floor(seconds / 60)
@@ -48,6 +76,49 @@ function modeColor(mode) {
   return "#8b6d5c";
 }
 
+function blendHexColor(startHex, endHex, ratio) {
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const start = startHex.replace("#", "");
+  const end = endHex.replace("#", "");
+
+  const sr = parseInt(start.slice(0, 2), 16);
+  const sg = parseInt(start.slice(2, 4), 16);
+  const sb = parseInt(start.slice(4, 6), 16);
+  const er = parseInt(end.slice(0, 2), 16);
+  const eg = parseInt(end.slice(2, 4), 16);
+  const eb = parseInt(end.slice(4, 6), 16);
+
+  const r = Math.round(sr + (er - sr) * clamped);
+  const g = Math.round(sg + (eg - sg) * clamped);
+  const b = Math.round(sb + (eb - sb) * clamped);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function focusColorByRemainingRatio(remainingRatio) {
+  const ratio = Math.max(0, Math.min(1, remainingRatio));
+  if (ratio >= 0.5) {
+    return blendHexColor("#3b82f6", "#facc15", (1 - ratio) / 0.5);
+  }
+  return blendHexColor("#facc15", "#ef4444", (0.5 - ratio) / 0.5);
+}
+
+function resolveUiVariant() {
+  const query = new URLSearchParams(window.location.search).get("ui");
+  if (query === "control" || query === "enhanced") {
+    localStorage.setItem("uiVariant", query);
+    return query;
+  }
+
+  const saved = localStorage.getItem("uiVariant");
+  if (saved === "control" || saved === "enhanced") {
+    return saved;
+  }
+
+  const assigned = Math.random() < 0.5 ? "control" : "enhanced";
+  localStorage.setItem("uiVariant", assigned);
+  return assigned;
+}
+
 function baseDuration(mode) {
   if (mode === "break") {
     return state.breakDuration;
@@ -58,12 +129,23 @@ function baseDuration(mode) {
 function renderTimer() {
   timeDisplay.textContent = formatTime(state.remaining);
   statusText.textContent = modeText(state.mode);
-  statusText.style.color = modeColor(state.mode);
 
   const total = Math.max(1, baseDuration(state.mode));
-  const progress = Math.max(0, Math.min(100, ((total - state.remaining) / total) * 100));
-  ringWrap.style.setProperty("--progress", progress.toFixed(2));
-  ringWrap.style.setProperty("--ring-color", modeColor(state.mode));
+  const remainingRatio = Math.max(0, Math.min(1, state.remaining / total));
+  const elapsedProgress = Math.max(0, Math.min(100, ((total - state.remaining) / total) * 100));
+
+  if (state.uiVariant === "enhanced" && state.mode === "working") {
+    const focusColor = focusColorByRemainingRatio(remainingRatio);
+    ringWrap.style.setProperty("--progress", (remainingRatio * 100).toFixed(2));
+    ringWrap.style.setProperty("--ring-color", focusColor);
+    statusText.style.color = focusColor;
+    document.body.classList.add("focus-active");
+  } else {
+    ringWrap.style.setProperty("--progress", elapsedProgress.toFixed(2));
+    ringWrap.style.setProperty("--ring-color", modeColor(state.mode));
+    statusText.style.color = modeColor(state.mode);
+    document.body.classList.remove("focus-active");
+  }
 }
 
 function setError(message) {
@@ -101,12 +183,17 @@ async function api(path, options = {}) {
 }
 
 // Phase 6: Sound notification
-function playNotificationSound(type = "complete") {
-  if (!state.soundEnabled) {
+function playNotificationSound(type = "end") {
+  if (type === "start" && !state.soundSettings.start) {
+    return;
+  }
+  if (type === "end" && !state.soundSettings.end) {
+    return;
+  }
+  if (type === "tick" && !state.soundSettings.tick) {
     return;
   }
   try {
-    // Use Web Audio API to generate simple beep tone
     const context = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = context.createOscillator();
     const gainNode = context.createGain();
@@ -114,46 +201,171 @@ function playNotificationSound(type = "complete") {
     oscillator.connect(gainNode);
     gainNode.connect(context.destination);
 
-    if (type === "complete") {
+    if (type === "start") {
+      oscillator.frequency.value = 660;
+      gainNode.gain.setValueAtTime(0.16, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.2);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.2);
+    } else if (type === "tick") {
+      oscillator.frequency.value = 420;
+      gainNode.gain.setValueAtTime(0.04, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.08);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.08);
+    } else {
       oscillator.frequency.value = 800;
-      gainNode.gain.setValueAtTime(0.3, context.currentTime);
+      gainNode.gain.setValueAtTime(0.25, context.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
       oscillator.start(context.currentTime);
       oscillator.stop(context.currentTime + 0.5);
-    } else if (type === "break") {
-      oscillator.frequency.value = 600;
-      gainNode.gain.setValueAtTime(0.2, context.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.3);
-      oscillator.start(context.currentTime);
-      oscillator.stop(context.currentTime + 0.3);
     }
   } catch (e) {
     console.log("Sound notification not available:", e);
   }
 }
 
-// Phase 6: Dark mode toggle
-function toggleDarkMode() {
-  state.darkMode = !state.darkMode;
-  localStorage.setItem("darkMode", state.darkMode.toString());
-  document.documentElement.setAttribute("data-theme", state.darkMode ? "dark" : "light");
+function applyTheme(theme) {
+  state.theme = ["light", "dark", "focus"].includes(theme) ? theme : "light";
+  localStorage.setItem("theme", state.theme);
+  document.documentElement.setAttribute("data-theme", state.theme);
+  if (themeIcon) {
+    themeIcon.textContent = state.theme === "dark" ? "🌙" : state.theme === "focus" ? "🎯" : "☀️";
+  }
+  if (themeSelect) {
+    themeSelect.value = state.theme;
+  }
 }
 
-// Initialize dark mode on load
-function initDarkMode() {
-  document.documentElement.setAttribute("data-theme", state.darkMode ? "dark" : "light");
+function cycleTheme() {
+  const currentIndex = ["light", "dark", "focus"].indexOf(state.theme);
+  const nextIndex = (currentIndex + 1) % 3;
+  applyTheme(["light", "dark", "focus"][nextIndex]);
+}
+
+function syncSoundSettingsUI() {
+  startSoundCheckbox.checked = state.soundSettings.start;
+  endSoundCheckbox.checked = state.soundSettings.end;
+  tickSoundCheckbox.checked = state.soundSettings.tick;
+}
+
+function applySoundSettingsFromUI() {
+  state.soundSettings.start = startSoundCheckbox.checked;
+  state.soundSettings.end = endSoundCheckbox.checked;
+  state.soundSettings.tick = tickSoundCheckbox.checked;
+  localStorage.setItem("soundStartEnabled", String(state.soundSettings.start));
+  localStorage.setItem("soundEndEnabled", String(state.soundSettings.end));
+  localStorage.setItem("soundTickEnabled", String(state.soundSettings.tick));
+}
+
+function openSettingsModal() {
+  workDurationInput.value = String(state.workDuration);
+  breakDurationInput.value = String(state.breakDuration);
+  longBreakDurationInput.value = String(state.longBreakDuration);
+  sessionsUntilLongBreakInput.value = String(state.sessionsUntilLongBreak);
+  themeSelect.value = state.theme;
+  syncSoundSettingsUI();
+  settingsModal.classList.remove("hidden");
+  settingsModal.setAttribute("aria-hidden", "false");
+}
+
+function closeSettingsModal() {
+  settingsModal.classList.add("hidden");
+  settingsModal.setAttribute("aria-hidden", "true");
+}
+
+async function applySettings() {
+  const payload = {
+    work_duration: Number(workDurationInput.value),
+    break_duration: Number(breakDurationInput.value),
+    long_break_duration: Number(longBreakDurationInput.value),
+    sessions_until_long_break: Number(sessionsUntilLongBreakInput.value),
+  };
+  await api("/api/config", { method: "POST", body: payload });
+  state.workDuration = payload.work_duration || state.workDuration;
+  state.breakDuration = payload.break_duration || state.breakDuration;
+  state.longBreakDuration = payload.long_break_duration || state.longBreakDuration;
+  state.sessionsUntilLongBreak = payload.sessions_until_long_break || state.sessionsUntilLongBreak;
+  applyTheme(themeSelect.value);
+  applySoundSettingsFromUI();
+  closeSettingsModal();
+  await refreshState();
+  renderTimer();
+}
+
+function initUiVariant() {
+  state.uiVariant = resolveUiVariant();
+  document.body.dataset.uiVariant = state.uiVariant;
 }
 
 async function refreshStats() {
   try {
-    const stats = await api("/api/stats/today");
-    const sessions = Number(stats.sessions || 0);
-    const formatTime = stats.formatted_time || `${Math.floor((stats.total_focus_time || 0) / 60)}分`;
+    const [todayStats, weekStats, monthStats] = await Promise.all([
+      api("/api/stats/today"),
+      api("/api/stats/week"),
+      api("/api/stats/month"),
+    ]);
+    const sessions = Number(todayStats.sessions || 0);
+    const formatTime = todayStats.formatted_time || `${Math.floor((todayStats.total_focus_time || 0) / 60)}分`;
 
     sessionsValue.textContent = String(sessions);
     focusMinutesValue.textContent = formatTime;
+    levelValue.textContent = `Lv.${todayStats.level || 1}`;
+    streakValue.textContent = `${todayStats.streak_days || 0}日`;
+    xpValue.textContent = `${todayStats.xp || 0} XP`;
+
+    renderBadges(todayStats.badges || []);
+    renderPeriodSummary(weekSummary, weekStats);
+    renderPeriodSummary(monthSummary, monthStats);
+    renderMiniChart(weekChart, weekStats.chart_data || [], 7);
+    renderMiniChart(monthChart, monthStats.chart_data || [], 10);
   } catch (error) {
     setError(error.message);
+  }
+}
+
+function renderBadges(badges) {
+  badgeList.innerHTML = "";
+  for (const badge of badges) {
+    const chip = document.createElement("span");
+    chip.className = `badge-chip${badge.achieved ? " achieved" : ""}`;
+    chip.textContent = badge.achieved ? `🏅 ${badge.title}` : `🔒 ${badge.title}`;
+    chip.setAttribute("aria-label", `${badge.title} - ${badge.achieved ? "達成済み" : "未達成"}`);
+    badgeList.appendChild(chip);
+  }
+}
+
+function renderPeriodSummary(target, periodStats) {
+  const completionRate = Number(periodStats.completion_rate || 0).toFixed(1);
+  const averageFocusMinutes = Math.floor((periodStats.average_focus_time || 0) / 60);
+  target.textContent = `完了率: ${completionRate}% / 平均集中: ${averageFocusMinutes}分`;
+}
+
+function renderMiniChart(target, chartData, limit = 7) {
+  target.innerHTML = "";
+  const recentData = chartData.slice(-limit);
+  target.style.gridTemplateColumns = `repeat(${Math.max(recentData.length, 1)}, 1fr)`;
+
+  if (recentData.length === 0) {
+    const placeholder = document.createElement("div");
+    placeholder.className = "bar";
+    placeholder.style.height = "4%";
+    placeholder.style.opacity = "0.2";
+    placeholder.title = "データなし";
+    target.appendChild(placeholder);
+    return;
+  }
+
+  const maxSessions = Math.max(1, ...recentData.map((item) => item.sessions || 0));
+
+  for (const item of recentData) {
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    const sessions = item.sessions || 0;
+    const height = Math.max(4, Math.round((sessions / maxSessions) * 100));
+    bar.style.height = `${height}%`;
+    bar.title = `${item.date}: ${sessions}回`;
+    target.appendChild(bar);
   }
 }
 
@@ -214,13 +426,15 @@ function startLoop() {
     try {
       const data = await api("/api/timer/tick", { method: "POST" });
       applyApiState(data);
+      if (data.remaining > 0) {
+        playNotificationSound("tick");
+      }
 
       if (data.remaining === 0) {
-        playNotificationSound("complete");
+        playNotificationSound("end");
         if (data.state === "working") {
           const breakState = await api("/api/timer/start-break", { method: "POST" });
           applyApiState(breakState);
-          playNotificationSound("break");
           await refreshStats();
         } else {
           stopLoop();
@@ -238,6 +452,7 @@ function startLoop() {
 async function startWork() {
   try {
     const data = await api("/api/timer/start-work", { method: "POST" });
+    playNotificationSound("start");
     state.workDuration = Math.max(data.remaining || 0, 1);
     applyApiState(data);
     setError("");
@@ -269,8 +484,35 @@ resetButton.addEventListener("click", () => {
   void resetTimer();
 });
 
+darkModeBtn.addEventListener("click", () => {
+  cycleTheme();
+});
+
+settingsBtn.addEventListener("click", () => {
+  openSettingsModal();
+});
+
+closeSettingsBtn.addEventListener("click", () => {
+  closeSettingsModal();
+});
+
+cancelSettingsBtn.addEventListener("click", () => {
+  closeSettingsModal();
+});
+
+applySettingsBtn.addEventListener("click", () => {
+  void applySettings();
+});
+
+settingsModal.addEventListener("click", (event) => {
+  if (event.target === settingsModal) {
+    closeSettingsModal();
+  }
+});
+
 async function init() {
-  initDarkMode();
+  initUiVariant();
+  applyTheme(state.theme);
   await loadConfig();
   await refreshState();
   if (state.mode === "working" || state.mode === "break") {

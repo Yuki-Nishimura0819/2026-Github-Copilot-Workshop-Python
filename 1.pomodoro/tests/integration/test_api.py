@@ -64,6 +64,10 @@ def test_stats_today_with_formatting(client):
     assert "formatted_time" in payload
     assert "total_minutes" in payload
     assert "total_hours" in payload
+    assert "xp" in payload
+    assert "level" in payload
+    assert "streak_days" in payload
+    assert "badges" in payload
 
 
 def test_config_get_endpoint(client):
@@ -76,12 +80,14 @@ def test_config_get_endpoint(client):
     assert "break_duration" in payload
     assert "long_break_duration" in payload
     assert "sessions_until_long_break" in payload
+    assert payload["work_duration_options"] == [900, 1500, 2100, 2700]
+    assert payload["break_duration_options"] == [300, 600, 900]
 
 
 def test_config_update_endpoint(client):
     """Test updating configuration."""
     new_config = {
-        "work_duration": 1200,
+        "work_duration": 2100,
         "break_duration": 600,
         "long_break_duration": 1200,
         "sessions_until_long_break": 3,
@@ -96,30 +102,26 @@ def test_config_update_endpoint(client):
     # Verify new config is returned
     verify = client.get("/api/config")
     verify_payload = verify.get_json()
-    assert verify_payload["work_duration"] == 1200
+    assert verify_payload["work_duration"] == 2100
     assert verify_payload["break_duration"] == 600
 
 
 def test_config_validation_boundaries(client):
-    """Test that config validation enforces boundaries."""
-    # Get initial config  
+    """Test that config validation enforces allowed options."""
     initial = client.get("/api/config")
     initial_work_duration = initial.get_json()["work_duration"]
-    
-    # Try to set invalid value (too low)
+
+    # 1200 is within 60-3600 but not an allowed preset value.
     invalid_config = {
-        "work_duration": 10,  # Too low, should be rejected
+        "work_duration": 1200,
     }
-    
+
     response = client.post("/api/config", json=invalid_config)
-    
-    # Verify response is 200 (endpoint doesn't error, just ignores)
+
     assert response.status_code == 200
-    
-    # Verify value wasn't changed (should remain the same)
+
     verify = client.get("/api/config")
     payload = verify.get_json()
-    # Value should not have changed to the invalid value
     assert payload["work_duration"] == initial_work_duration
 
 
@@ -137,7 +139,26 @@ def test_stats_week_endpoint(client):
     assert "total_sessions" in payload
     assert "total_focus_time" in payload
     assert "daily" in payload
+    assert "completion_rate" in payload
+    assert "average_focus_time" in payload
+    assert "chart_data" in payload
     assert isinstance(payload["daily"], dict)
+
+
+def test_stats_month_endpoint(client):
+    """Test fetching monthly statistics."""
+    client.post("/api/timer/start-work")
+    for _ in range(10):
+        client.post("/api/timer/tick")
+
+    response = client.get("/api/stats/month")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert "total_sessions" in payload
+    assert "total_focus_time" in payload
+    assert "completion_rate" in payload
+    assert "average_focus_time" in payload
+    assert "chart_data" in payload
 
 
 def test_stats_by_date_endpoint(client):
