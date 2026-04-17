@@ -13,6 +13,7 @@ const state = {
     tick: localStorage.getItem("soundTickEnabled") === "true",
   },
   theme: localStorage.getItem("theme") || "light",
+  uiVariant: "enhanced",
 };
 
 const statusText = document.getElementById("statusText");
@@ -75,6 +76,49 @@ function modeColor(mode) {
   return "#8b6d5c";
 }
 
+function blendHexColor(startHex, endHex, ratio) {
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const start = startHex.replace("#", "");
+  const end = endHex.replace("#", "");
+
+  const sr = parseInt(start.slice(0, 2), 16);
+  const sg = parseInt(start.slice(2, 4), 16);
+  const sb = parseInt(start.slice(4, 6), 16);
+  const er = parseInt(end.slice(0, 2), 16);
+  const eg = parseInt(end.slice(2, 4), 16);
+  const eb = parseInt(end.slice(4, 6), 16);
+
+  const r = Math.round(sr + (er - sr) * clamped);
+  const g = Math.round(sg + (eg - sg) * clamped);
+  const b = Math.round(sb + (eb - sb) * clamped);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function focusColorByRemainingRatio(remainingRatio) {
+  const ratio = Math.max(0, Math.min(1, remainingRatio));
+  if (ratio >= 0.5) {
+    return blendHexColor("#3b82f6", "#facc15", (1 - ratio) / 0.5);
+  }
+  return blendHexColor("#facc15", "#ef4444", (0.5 - ratio) / 0.5);
+}
+
+function resolveUiVariant() {
+  const query = new URLSearchParams(window.location.search).get("ui");
+  if (query === "control" || query === "enhanced") {
+    localStorage.setItem("uiVariant", query);
+    return query;
+  }
+
+  const saved = localStorage.getItem("uiVariant");
+  if (saved === "control" || saved === "enhanced") {
+    return saved;
+  }
+
+  const assigned = Math.random() < 0.5 ? "control" : "enhanced";
+  localStorage.setItem("uiVariant", assigned);
+  return assigned;
+}
+
 function baseDuration(mode) {
   if (mode === "break") {
     return state.breakDuration;
@@ -85,12 +129,23 @@ function baseDuration(mode) {
 function renderTimer() {
   timeDisplay.textContent = formatTime(state.remaining);
   statusText.textContent = modeText(state.mode);
-  statusText.style.color = modeColor(state.mode);
 
   const total = Math.max(1, baseDuration(state.mode));
-  const progress = Math.max(0, Math.min(100, ((total - state.remaining) / total) * 100));
-  ringWrap.style.setProperty("--progress", progress.toFixed(2));
-  ringWrap.style.setProperty("--ring-color", modeColor(state.mode));
+  const remainingRatio = Math.max(0, Math.min(1, state.remaining / total));
+  const elapsedProgress = Math.max(0, Math.min(100, ((total - state.remaining) / total) * 100));
+
+  if (state.uiVariant === "enhanced" && state.mode === "working") {
+    const focusColor = focusColorByRemainingRatio(remainingRatio);
+    ringWrap.style.setProperty("--progress", (remainingRatio * 100).toFixed(2));
+    ringWrap.style.setProperty("--ring-color", focusColor);
+    statusText.style.color = focusColor;
+    document.body.classList.add("focus-active");
+  } else {
+    ringWrap.style.setProperty("--progress", elapsedProgress.toFixed(2));
+    ringWrap.style.setProperty("--ring-color", modeColor(state.mode));
+    statusText.style.color = modeColor(state.mode);
+    document.body.classList.remove("focus-active");
+  }
 }
 
 function setError(message) {
@@ -236,6 +291,11 @@ async function applySettings() {
   closeSettingsModal();
   await refreshState();
   renderTimer();
+}
+
+function initUiVariant() {
+  state.uiVariant = resolveUiVariant();
+  document.body.dataset.uiVariant = state.uiVariant;
 }
 
 async function refreshStats() {
@@ -451,6 +511,7 @@ settingsModal.addEventListener("click", (event) => {
 });
 
 async function init() {
+  initUiVariant();
   applyTheme(state.theme);
   await loadConfig();
   await refreshState();
