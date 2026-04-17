@@ -5,6 +5,9 @@ from models.repository import FileRepository, InMemoryRepository
 from services.stats_service import StatsService
 from services.timer_service import TimerService
 
+WORK_DURATION_OPTIONS = {900, 1500, 2100, 2700}
+BREAK_DURATION_OPTIONS = {300, 600, 900}
+
 
 def create_app(config_object=None):
     """Application factory for environment-based startup."""
@@ -73,6 +76,8 @@ def create_app(config_object=None):
             "break_duration": app.config.get("BREAK_DURATION", 300),
             "long_break_duration": app.config.get("LONG_BREAK_DURATION", 900),
             "sessions_until_long_break": app.config.get("SESSIONS_UNTIL_LONG_BREAK", 4),
+            "work_duration_options": sorted(WORK_DURATION_OPTIONS),
+            "break_duration_options": sorted(BREAK_DURATION_OPTIONS),
         })
 
     @app.post("/api/config")
@@ -81,22 +86,24 @@ def create_app(config_object=None):
         # Validate and update configuration
         if "work_duration" in data:
             val = int(data.get("work_duration", 0))
-            if 60 <= val <= 3600:
+            if val in WORK_DURATION_OPTIONS:
                 app.config["WORK_DURATION"] = val
                 timer_service.config.WORK_DURATION = val
         if "break_duration" in data:
             val = int(data.get("break_duration", 0))
-            if 60 <= val <= 1800:
+            if val in BREAK_DURATION_OPTIONS:
                 app.config["BREAK_DURATION"] = val
                 timer_service.config.BREAK_DURATION = val
         if "long_break_duration" in data:
             val = int(data.get("long_break_duration", 0))
             if 300 <= val <= 3600:
                 app.config["LONG_BREAK_DURATION"] = val
+                timer_service.config.LONG_BREAK_DURATION = val
         if "sessions_until_long_break" in data:
             val = int(data.get("sessions_until_long_break", 0))
             if 1 <= val <= 10:
                 app.config["SESSIONS_UNTIL_LONG_BREAK"] = val
+                timer_service.config.SESSIONS_UNTIL_LONG_BREAK = val
 
         return jsonify({"status": "updated"}), 200
 
