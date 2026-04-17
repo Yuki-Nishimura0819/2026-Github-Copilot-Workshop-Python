@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pomodoro Timer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="bg-shape shape-a" aria-hidden="true"></div>
+  <div class="bg-shape shape-b" aria-hidden="true"></div>
+
+  <main class="app-shell">
+    <header class="app-header">
+      <div class="header-top">
+        <p class="eyebrow">FOCUS CYCLE</p>
+        <div class="header-controls">
+          <button id="darkModeBtn" class="btn-icon" title="ダークモード切り替え" aria-label="ダークモード切り替え">
+            <span id="themeIcon">🌙</span>
+          </button>
+          <button id="settingsBtn" class="btn-icon" title="設定を開く" aria-label="設定を開く">⚙️</button>
+        </div>
+      </div>
+      <h1>ポモドーロタイマー</h1>
+      <p id="statusText" class="status-text">待機中</p>
+    </header>
+
+    <section class="timer-panel" aria-label="タイマー">
+      <div class="ring-wrap" id="ringWrap" data-progress="0">
+        <div class="ring-inner">
+          <p class="time-label">残り時間</p>
+          <p id="timeDisplay" class="time-value">25:00</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="startButton" class="btn btn-primary" type="button">開始</button>
+        <button id="resetButton" class="btn btn-ghost" type="button">リセット</button>
+      </div>
+    </section>
+
+    <section class="stats-panel" aria-label="今日の進捗">
+      <h2>今日の進捗</h2>
+      <div class="stats-grid">
+        <article class="stat-card">
+          <p class="stat-label">完了セッション</p>
+          <p id="sessionsValue" class="stat-value">0</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">集中時間</p>
+          <p id="focusMinutesValue" class="stat-value">0分</p>
+        </article>
+      </div>
+    </section>
+
+    <p id="errorMessage" class="error-message" role="alert" aria-live="polite"></p>
+  </main>
+
+  <!-- Settings Modal (Phase 6) -->
+  <div id="settingsModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="settingsTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="settingsTitle">設定</h2>
+        <button id="closeSettingsBtn" class="btn-close" aria-label="閉じる">&times;</button>
+      </div>
+      <div class="modal-body">
+        <fieldset class="settings-group">
+          <legend>タイマー設定</legend>
+          <div class="setting-item">
+            <label for="workDurationInput">作業時間（秒）</label>
+            <input type="number" id="workDurationInput" min="60" max="3600" value="1500">
+          </div>
+          <div class="setting-item">
+            <label for="breakDurationInput">休憩時間（秒）</label>
+            <input type="number" id="breakDurationInput" min="60" max="1800" value="300">
+          </div>
+          <div class="setting-item">
+            <label for="longBreakDurationInput">長休憩時間（秒）</label>
+            <input type="number" id="longBreakDurationInput" min="300" max="3600" value="900">
+          </div>
+          <div class="setting-item">
+            <label for="sessionsUntilLongBreakInput">長休憩までのセッション数</label>
+            <input type="number" id="sessionsUntilLongBreakInput" min="1" max="10" value="4">
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-group">
+          <legend>通知・アクセシビリティ</legend>
+          <div class="setting-item checkbox">
+            <input type="checkbox" id="soundEnabledCheckbox" checked>
+            <label for="soundEnabledCheckbox">音声通知を有効にする</label>
+          </div>
+        </fieldset>
+      </div>
+      <div class="modal-footer">
+        <button id="applySettingsBtn" class="btn btn-primary" type="button">適用</button>
+        <button id="cancelSettingsBtn" class="btn btn-ghost" type="button">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/timer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+</body>
+</html>
