@@ -7,8 +7,12 @@ const state = {
   sessionsUntilLongBreak: 4,
   timerId: null,
   statsRefreshId: null,
-  soundEnabled: localStorage.getItem("soundEnabled") !== "false",
-  darkMode: localStorage.getItem("darkMode") === "true",
+  soundSettings: {
+    start: localStorage.getItem("soundStartEnabled") !== "false",
+    end: localStorage.getItem("soundEndEnabled") !== "false",
+    tick: localStorage.getItem("soundTickEnabled") === "true",
+  },
+  theme: localStorage.getItem("theme") || "light",
 };
 
 const statusText = document.getElementById("statusText");
@@ -19,6 +23,21 @@ const ringWrap = document.getElementById("ringWrap");
 const errorMessage = document.getElementById("errorMessage");
 const startButton = document.getElementById("startButton");
 const resetButton = document.getElementById("resetButton");
+const darkModeBtn = document.getElementById("darkModeBtn");
+const themeIcon = document.getElementById("themeIcon");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsModal = document.getElementById("settingsModal");
+const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+const cancelSettingsBtn = document.getElementById("cancelSettingsBtn");
+const applySettingsBtn = document.getElementById("applySettingsBtn");
+const workDurationInput = document.getElementById("workDurationInput");
+const breakDurationInput = document.getElementById("breakDurationInput");
+const longBreakDurationInput = document.getElementById("longBreakDurationInput");
+const sessionsUntilLongBreakInput = document.getElementById("sessionsUntilLongBreakInput");
+const themeSelect = document.getElementById("themeSelect");
+const startSoundCheckbox = document.getElementById("startSoundCheckbox");
+const endSoundCheckbox = document.getElementById("endSoundCheckbox");
+const tickSoundCheckbox = document.getElementById("tickSoundCheckbox");
 
 function formatTime(seconds) {
   const mins = Math.floor(seconds / 60)
@@ -101,12 +120,17 @@ async function api(path, options = {}) {
 }
 
 // Phase 6: Sound notification
-function playNotificationSound(type = "complete") {
-  if (!state.soundEnabled) {
+function playNotificationSound(type = "end") {
+  if (type === "start" && !state.soundSettings.start) {
+    return;
+  }
+  if (type === "end" && !state.soundSettings.end) {
+    return;
+  }
+  if (type === "tick" && !state.soundSettings.tick) {
     return;
   }
   try {
-    // Use Web Audio API to generate simple beep tone
     const context = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = context.createOscillator();
     const gainNode = context.createGain();
@@ -114,34 +138,96 @@ function playNotificationSound(type = "complete") {
     oscillator.connect(gainNode);
     gainNode.connect(context.destination);
 
-    if (type === "complete") {
+    if (type === "start") {
+      oscillator.frequency.value = 660;
+      gainNode.gain.setValueAtTime(0.16, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.2);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.2);
+    } else if (type === "tick") {
+      oscillator.frequency.value = 420;
+      gainNode.gain.setValueAtTime(0.04, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.08);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.08);
+    } else {
       oscillator.frequency.value = 800;
-      gainNode.gain.setValueAtTime(0.3, context.currentTime);
+      gainNode.gain.setValueAtTime(0.25, context.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
       oscillator.start(context.currentTime);
       oscillator.stop(context.currentTime + 0.5);
-    } else if (type === "break") {
-      oscillator.frequency.value = 600;
-      gainNode.gain.setValueAtTime(0.2, context.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.3);
-      oscillator.start(context.currentTime);
-      oscillator.stop(context.currentTime + 0.3);
     }
   } catch (e) {
     console.log("Sound notification not available:", e);
   }
 }
 
-// Phase 6: Dark mode toggle
-function toggleDarkMode() {
-  state.darkMode = !state.darkMode;
-  localStorage.setItem("darkMode", state.darkMode.toString());
-  document.documentElement.setAttribute("data-theme", state.darkMode ? "dark" : "light");
+function applyTheme(theme) {
+  state.theme = ["light", "dark", "focus"].includes(theme) ? theme : "light";
+  localStorage.setItem("theme", state.theme);
+  document.documentElement.setAttribute("data-theme", state.theme);
+  if (themeIcon) {
+    themeIcon.textContent = state.theme === "dark" ? "🌙" : state.theme === "focus" ? "🎯" : "☀️";
+  }
+  if (themeSelect) {
+    themeSelect.value = state.theme;
+  }
 }
 
-// Initialize dark mode on load
-function initDarkMode() {
-  document.documentElement.setAttribute("data-theme", state.darkMode ? "dark" : "light");
+function cycleTheme() {
+  const currentIndex = ["light", "dark", "focus"].indexOf(state.theme);
+  const nextIndex = (currentIndex + 1) % 3;
+  applyTheme(["light", "dark", "focus"][nextIndex]);
+}
+
+function syncSoundSettingsUI() {
+  startSoundCheckbox.checked = state.soundSettings.start;
+  endSoundCheckbox.checked = state.soundSettings.end;
+  tickSoundCheckbox.checked = state.soundSettings.tick;
+}
+
+function applySoundSettingsFromUI() {
+  state.soundSettings.start = startSoundCheckbox.checked;
+  state.soundSettings.end = endSoundCheckbox.checked;
+  state.soundSettings.tick = tickSoundCheckbox.checked;
+  localStorage.setItem("soundStartEnabled", String(state.soundSettings.start));
+  localStorage.setItem("soundEndEnabled", String(state.soundSettings.end));
+  localStorage.setItem("soundTickEnabled", String(state.soundSettings.tick));
+}
+
+function openSettingsModal() {
+  workDurationInput.value = String(state.workDuration);
+  breakDurationInput.value = String(state.breakDuration);
+  longBreakDurationInput.value = String(state.longBreakDuration);
+  sessionsUntilLongBreakInput.value = String(state.sessionsUntilLongBreak);
+  themeSelect.value = state.theme;
+  syncSoundSettingsUI();
+  settingsModal.classList.remove("hidden");
+  settingsModal.setAttribute("aria-hidden", "false");
+}
+
+function closeSettingsModal() {
+  settingsModal.classList.add("hidden");
+  settingsModal.setAttribute("aria-hidden", "true");
+}
+
+async function applySettings() {
+  const payload = {
+    work_duration: Number(workDurationInput.value),
+    break_duration: Number(breakDurationInput.value),
+    long_break_duration: Number(longBreakDurationInput.value),
+    sessions_until_long_break: Number(sessionsUntilLongBreakInput.value),
+  };
+  await api("/api/config", { method: "POST", body: payload });
+  state.workDuration = payload.work_duration || state.workDuration;
+  state.breakDuration = payload.break_duration || state.breakDuration;
+  state.longBreakDuration = payload.long_break_duration || state.longBreakDuration;
+  state.sessionsUntilLongBreak = payload.sessions_until_long_break || state.sessionsUntilLongBreak;
+  applyTheme(themeSelect.value);
+  applySoundSettingsFromUI();
+  closeSettingsModal();
+  await refreshState();
+  renderTimer();
 }
 
 async function refreshStats() {
@@ -214,13 +300,15 @@ function startLoop() {
     try {
       const data = await api("/api/timer/tick", { method: "POST" });
       applyApiState(data);
+      if (data.remaining > 0) {
+        playNotificationSound("tick");
+      }
 
       if (data.remaining === 0) {
-        playNotificationSound("complete");
+        playNotificationSound("end");
         if (data.state === "working") {
           const breakState = await api("/api/timer/start-break", { method: "POST" });
           applyApiState(breakState);
-          playNotificationSound("break");
           await refreshStats();
         } else {
           stopLoop();
@@ -238,6 +326,7 @@ function startLoop() {
 async function startWork() {
   try {
     const data = await api("/api/timer/start-work", { method: "POST" });
+    playNotificationSound("start");
     state.workDuration = Math.max(data.remaining || 0, 1);
     applyApiState(data);
     setError("");
@@ -269,8 +358,34 @@ resetButton.addEventListener("click", () => {
   void resetTimer();
 });
 
+darkModeBtn.addEventListener("click", () => {
+  cycleTheme();
+});
+
+settingsBtn.addEventListener("click", () => {
+  openSettingsModal();
+});
+
+closeSettingsBtn.addEventListener("click", () => {
+  closeSettingsModal();
+});
+
+cancelSettingsBtn.addEventListener("click", () => {
+  closeSettingsModal();
+});
+
+applySettingsBtn.addEventListener("click", () => {
+  void applySettings();
+});
+
+settingsModal.addEventListener("click", (event) => {
+  if (event.target === settingsModal) {
+    closeSettingsModal();
+  }
+});
+
 async function init() {
-  initDarkMode();
+  applyTheme(state.theme);
   await loadConfig();
   await refreshState();
   if (state.mode === "working" || state.mode === "break") {
