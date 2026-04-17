@@ -64,6 +64,10 @@ def test_stats_today_with_formatting(client):
     assert "formatted_time" in payload
     assert "total_minutes" in payload
     assert "total_hours" in payload
+    assert "xp" in payload
+    assert "level" in payload
+    assert "streak_days" in payload
+    assert "badges" in payload
 
 
 def test_config_get_endpoint(client):
@@ -135,7 +139,26 @@ def test_stats_week_endpoint(client):
     assert "total_sessions" in payload
     assert "total_focus_time" in payload
     assert "daily" in payload
+    assert "completion_rate" in payload
+    assert "average_focus_time" in payload
+    assert "chart_data" in payload
     assert isinstance(payload["daily"], dict)
+
+
+def test_stats_month_endpoint(client):
+    """Test fetching monthly statistics."""
+    client.post("/api/timer/start-work")
+    for _ in range(10):
+        client.post("/api/timer/tick")
+
+    response = client.get("/api/stats/month")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert "total_sessions" in payload
+    assert "total_focus_time" in payload
+    assert "completion_rate" in payload
+    assert "average_focus_time" in payload
+    assert "chart_data" in payload
 
 
 def test_stats_by_date_endpoint(client):

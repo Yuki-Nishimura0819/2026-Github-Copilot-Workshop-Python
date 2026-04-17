@@ -207,6 +207,74 @@ h1 {
   font-family: "Space Grotesk", sans-serif;
 }
 
+.gamification-panel {
+  margin-top: 14px;
+}
+
+.xp-text {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+}
+
+.badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.badge-chip {
+  border-radius: 999px;
+  border: 1px solid #f2e8d8;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  background: #fff9f3;
+}
+
+.badge-chip.achieved {
+  border-color: #c9f0e9;
+  background: #e9fcf7;
+  color: #0f766e;
+}
+
+.period-stats-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.period-card {
+  border-radius: 16px;
+  padding: 14px;
+  border: 1px solid #f2e8d8;
+  background: #fff;
+}
+
+.period-card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.period-summary {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.mini-chart {
+  display: grid;
+  align-items: end;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  height: 78px;
+}
+
+.mini-chart .bar {
+  border-radius: 6px 6px 2px 2px;
+  background: color-mix(in srgb, var(--accent) 76%, white 24%);
+  min-height: 4px;
+}
+
 .error-message {
   min-height: 1.25em;
   margin: 16px 4px 0;
@@ -252,6 +320,10 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .period-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
   .actions {
     flex-direction: column;
   }
@@ -285,6 +357,11 @@ html[data-theme="dark"] .ring-inner {
 
 html[data-theme="dark"] .stat-card {
   background: linear-gradient(170deg, #3a3a3a, #2d2d2d);
+  border-color: #444;
+}
+
+html[data-theme="dark"] .period-card {
+  background: #2d2d2d;
   border-color: #444;
 }
 

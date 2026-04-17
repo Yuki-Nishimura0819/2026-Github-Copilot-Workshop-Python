@@ -134,6 +134,50 @@ def test_stats_service_get_week_stats():
 
     assert stats["total_sessions"] == 6
     assert stats["total_focus_time"] == 9000
+    assert "completion_rate" in stats
+    assert "average_focus_time" in stats
+    assert "chart_data" in stats
+
+
+def test_stats_service_gamification_fields():
+    """Test XP/level/streak/badges fields in today's stats."""
+    from models.repository import InMemoryRepository
+
+    repo = InMemoryRepository()
+    stats_service = StatsService(repo)
+
+    today = datetime.now()
+    for i in range(3):
+        date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        repo.save(f"stats:{date}", {"sessions": 4, "total_focus_time": 2400})
+
+    stats = stats_service.get_today_stats()
+
+    assert stats["xp"] >= 0
+    assert stats["level"] >= 1
+    assert stats["streak_days"] == 3
+    assert "badges" in stats
+    assert any(badge["id"] == "streak_3" and badge["achieved"] for badge in stats["badges"])
+
+
+def test_stats_service_get_month_stats():
+    """Test monthly statistics aggregation."""
+    from models.repository import InMemoryRepository
+
+    repo = InMemoryRepository()
+    stats_service = StatsService(repo)
+
+    today = datetime.now()
+    for i in range(5):
+        date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        repo.save(f"stats:{date}", {"sessions": 2, "total_focus_time": 1800})
+
+    stats = stats_service.get_month_stats()
+
+    assert stats["total_sessions"] == 10
+    assert stats["total_focus_time"] == 9000
+    assert "completion_rate" in stats
+    assert "chart_data" in stats
 
 
 def test_long_break_activation(timer_service):

@@ -62,6 +62,10 @@ def create_app(config_object=None):
     def get_week_stats():
         return jsonify(stats_service.get_week_stats())
 
+    @app.get("/api/stats/month")
+    def get_month_stats():
+        return jsonify(stats_service.get_month_stats())
+
     @app.get("/api/stats/date/<date_str>")
     def get_stats_by_date(date_str):
         stats = stats_service.get_stats_by_date(date_str)

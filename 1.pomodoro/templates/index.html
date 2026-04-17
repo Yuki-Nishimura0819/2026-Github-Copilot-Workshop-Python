@@ -53,6 +53,30 @@
           <p class="stat-label">集中時間</p>
           <p id="focusMinutesValue" class="stat-value">0分</p>
         </article>
+        <article class="stat-card">
+          <p class="stat-label">現在レベル</p>
+          <p id="levelValue" class="stat-value">Lv.1</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">連続日数（ストリーク）</p>
+          <p id="streakValue" class="stat-value">0日</p>
+        </article>
+      </div>
+      <div class="gamification-panel">
+        <p class="xp-text">経験値: <strong id="xpValue">0 XP</strong></p>
+        <div class="badge-list" id="badgeList" aria-label="達成バッジ"></div>
+      </div>
+      <div class="period-stats-grid">
+        <article class="period-card">
+          <h3>週間統計</h3>
+          <p id="weekSummary" class="period-summary">完了率: 0%</p>
+          <div id="weekChart" class="mini-chart" aria-label="週間グラフ"></div>
+        </article>
+        <article class="period-card">
+          <h3>月間統計</h3>
+          <p id="monthSummary" class="period-summary">完了率: 0%</p>
+          <div id="monthChart" class="mini-chart" aria-label="月間グラフ"></div>
+        </article>
       </div>
     </section>
 
